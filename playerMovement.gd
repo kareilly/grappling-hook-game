@@ -1,9 +1,10 @@
 extends CharacterBody3D
 
 @export var speed = 14
-@export var fall_acceleration = 60
+@export var fall_acceleration = 80
 
 var stomped = false
+var dashed = false
 var target_velocity = Vector3.ZERO
 var target_target_velocity = Vector3.ZERO
 var target_velocity_forward = 0
@@ -25,20 +26,29 @@ var ini_hook_dist
 var hook_dir
 var hook_pull_force: float = 4
 var hook_velocity: Vector3
+var hook_lift: float
 
 #@onready var hook: RayCast3D = get_node("/root/baseScene/CharacterBody3D/RayCast3D")
+@onready var spawn_point: Node3D = get_node("/root/baseScene/gameObjects/spawnPoint")
 @onready var camera: Camera3D = $playerCamera
 @onready var hook_point: CSGSphere3D = get_node("/root/baseScene/hookpoint")
 
 func _ready():
-	set_slide_on_ceiling_enabled(false) #maybe?
+	set_slide_on_ceiling_enabled(false)
+	self.global_position = spawn_point.global_position
+	target_velocity = Vector3.ZERO
+	velocity = Vector3.ZERO
+	hooking = false
+	stomped = false
+	dashed = false
 
 func jump_boost_timer():
 	await get_tree().create_timer(0.15).timeout
 	stomped = false
 	
 func dash_timer():
-	await get_tree().create_timer(0.1).timeout
+	await get_tree().create_timer(1.0).timeout
+	dashed = false
 	
 func hook_collision():
 	var centre = get_viewport().get_size()/2
@@ -58,9 +68,13 @@ func hook_collision():
 		print("nope")
 		
 func hook_force(direction: Vector3, force: float):
-	hook_velocity = direction * force * Vector3(1,0.6,1)
+	
+	hook_velocity = direction * force * Vector3(1,1,1)
 		
 func _input(event):
+	if event.is_action_pressed("restart"):
+		_ready()
+		
 	if event.is_action_pressed("hook"): #is_action_pressed("hook"):
 		if hooking == false:
 			print("hooked")
@@ -118,12 +132,15 @@ func _physics_process(_delta):
 		jump_speed = 30
 	
 	if Input.is_action_just_pressed("dash"):
-		dash_velocity = dash_speed * -look_dir
-		target_velocity += dash_velocity
+		if dashed == false:
+			dash_velocity = dash_speed * -look_dir
+			target_velocity += dash_velocity
+			dash_timer()
+			dashed = true
 		
 	if not is_on_floor():
 		target_velocity.y = target_velocity.y - (fall_acceleration * _delta)
-
+		
 		if stomped == false:
 			if Input.is_action_just_pressed("stomp"):
 				target_velocity.y -= 40
@@ -136,7 +153,7 @@ func _physics_process(_delta):
 			target_velocity = target_velocity.move_toward(Vector3(target_velocity.x/horiz_vel.length(), target_velocity.y, target_velocity.z/horiz_vel.length()) * max_ground_speed, _delta * ground_drag)
 			
 		if stomped == true:
-			jump_speed = 40
+			jump_speed = 50
 			jump_boost_timer()
 			
 		if Input.is_action_pressed("jump"):
@@ -147,12 +164,8 @@ func _physics_process(_delta):
 	if hooking == true:
 		hook_dir = hook_point.position - position
 		hook_force(hook_dir.normalized(),hook_pull_force)
-		if hook_dir.length() < 15:
-			if hook_dir.length() < 5:
-				hooking = false
-			hook_pull_force = 3
-		else:
-			hook_pull_force = 3.5
+		if not hook_dir.length() < 50 or hook_dir.length() < 5:
+			hooking = false
 
 		if position.y > hook_point.position.y:
 			if target_velocity.y < 0:

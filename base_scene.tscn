@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3 uid="uid://cidljeiy5wrpg"]
+[gd_scene load_steps=5 format=3 uid="uid://cidljeiy5wrpg"]
 
 [ext_resource type="Script" uid="uid://cjddcnx4jl77x" path="res://playerMovement.gd" id="1_1nqys"]
+[ext_resource type="Script" uid="uid://d05ojs1jk55q6" path="res://hook.gd" id="2_qcxwf"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_sabe2"]
 
@@ -55,6 +56,18 @@ use_collision = true
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(-0.0699132, 0, -0.997553, 0, 1, 0, 0.997553, 0, -0.0699132, -15.6317, 5.04083, 0)
+visible = false
 
 [node name="hookpoint" type="CSGSphere3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.2128, 1.46636, -0.74427)
+visible = false
+
+[node name="hookline" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.3939188, 3.37226, 0)
+size = Vector3(0.2, 0.2, 0.2)
+script = ExtResource("2_qcxwf")
+
+[node name="gameObjects" type="Node" parent="."]
+
+[node name="spawnPoint" type="Node3D" parent="gameObjects"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
