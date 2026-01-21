@@ -30,6 +30,9 @@ var hook_velocity: Vector3
 @onready var camera: Camera3D = $playerCamera
 @onready var hook_point: CSGSphere3D = get_node("/root/baseScene/hookpoint")
 
+func _ready():
+	set_slide_on_ceiling_enabled(false) #maybe?
+
 func jump_boost_timer():
 	await get_tree().create_timer(0.15).timeout
 	stomped = false
@@ -89,7 +92,7 @@ func _input(event):
 #		8. if the player is using a hook, do hook velocity calculations
 #		9. set velocity to target_velocity, run move_and_slide()
 
-func _physics_process(delta):
+func _physics_process(_delta):
 	var direction = Vector3.ZERO	#direction of player movement
 	direction = Input.get_vector("move_left","move_right","move_forward","move_backward")
 
@@ -105,7 +108,7 @@ func _physics_process(delta):
 	var _forward: Vector3 = camera.global_transform.basis * Vector3(direction.x, 0, direction.y)
 	var walk_dir: Vector3 = Vector3(_forward.x, 0, _forward.z).normalized()
 	
-	target_target_velocity = target_velocity.move_toward(walk_dir * speed * direction.length(), walk_accel * delta)
+	target_target_velocity = target_velocity.move_toward(walk_dir * speed * direction.length(), walk_accel * _delta)
 	target_velocity.x = target_target_velocity.x
 	target_velocity.z = target_target_velocity.z
 	#camera.global_transform.basis * Vector3(direction.x, 0, direction.y)
@@ -119,7 +122,7 @@ func _physics_process(delta):
 		target_velocity += dash_velocity
 		
 	if not is_on_floor():
-		target_velocity.y = target_velocity.y - (fall_acceleration * delta)
+		target_velocity.y = target_velocity.y - (fall_acceleration * _delta)
 
 		if stomped == false:
 			if Input.is_action_just_pressed("stomp"):
@@ -127,9 +130,10 @@ func _physics_process(delta):
 				stomped = true
 				
 	if is_on_floor():
+		target_velocity.y = 0	#avoids conservation of downwards momentum after falling onto a floor
 		var horiz_vel = Vector3(target_velocity.x, 0, target_velocity.z)
 		if horiz_vel.length() > max_ground_speed:
-			target_velocity = target_velocity.move_toward(Vector3(target_velocity.x/horiz_vel.length(), 0, target_velocity.z/horiz_vel.length()) * max_ground_speed, delta * ground_drag)
+			target_velocity = target_velocity.move_toward(Vector3(target_velocity.x/horiz_vel.length(), target_velocity.y, target_velocity.z/horiz_vel.length()) * max_ground_speed, _delta * ground_drag)
 			
 		if stomped == true:
 			jump_speed = 40
