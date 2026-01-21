@@ -70,9 +70,27 @@ func _input(event):
 	camera.rotation.y -= mouse_dir.x * 0.01 * 0.5
 	camera.rotation.x = clamp(camera.rotation.x - mouse_dir.y * 0.01 * 0.5, -1.5, 1.5)
 	
+#	player movement physics process (order is essential):
+#		1. get directional input vector: direction (wasd)
+#		2. is the player using a hook?
+#			y) set hook point outside of map, set walk accel and speed accordingly
+#			n) lower walk accel
+#		3. set target of the target velocity based on movement input
+#		4. get vector of the camera's direction: look_dir
+#		5. check if the player stomped last pass: if false, reset jump_speed to 30
+#		6. if dash is pressed: get dash velocity and add to target velocity (in dir of camera)
+#		7. is the player on the floor?
+#			n) apply gravity/fall acceleration
+#			y) perform the following:
+#				I) set horiz_vel to target velocity (on x & z) 
+#					- if above max ground speed, move_toward() max ground speed
+#				II) if the player stomped last pass, raise jump vel and set jump_boost_timer()
+#				III) if jump input is pressed, add jump speed to target velocity
+#		8. if the player is using a hook, do hook velocity calculations
+#		9. set velocity to target_velocity, run move_and_slide()
+
 func _physics_process(delta):
-	var direction = Vector3.ZERO
-	
+	var direction = Vector3.ZERO	#direction of player movement
 	direction = Input.get_vector("move_left","move_right","move_forward","move_backward")
 
 	if not hooking:
