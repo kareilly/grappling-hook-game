@@ -1,0 +1,13 @@
+codebase:
+  - refactor player_movement.gd
+  - refactor hook.gd
+  - refactor player_camera.gd
+
+game/level design:
+  - create a proper testing stage
+
+features:
+  - testing/implementation of 2 hooks (l/r)
+
+optimization + bugfixing:
+  - replace placeholder hook_point idle state
