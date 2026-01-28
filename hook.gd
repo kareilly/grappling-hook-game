@@ -1,6 +1,5 @@
 extends CSGBox3D
 
-var hook_range = 1000
 var start: Vector3
 var end: Vector3
 
@@ -8,7 +7,6 @@ var end: Vector3
 
 @onready var player: CharacterBody3D = get_node("/root/baseScene/CharacterBody3D")
 @onready var camera: Camera3D = get_node("/root/baseScene/CharacterBody3D/playerCamera")
-@onready var hook: RayCast3D = get_node("/root/baseScene/CharacterBody3D/RayCast3D")
 @onready var hook_point: CSGSphere3D = get_node("/root/baseScene/hookpoint")
 @onready var hook_line: CSGBox3D = get_node("/root/baseScene/hookline")
 

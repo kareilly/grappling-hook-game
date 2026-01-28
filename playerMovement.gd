@@ -1,23 +1,20 @@
 extends CharacterBody3D
 
 @export var speed = 14
-@export var fall_acceleration = 80
+@export var fall_acceleration = 75
 
 var stomped = false
-var dashed = false
 var target_velocity = Vector3.ZERO
-var target_target_velocity = Vector3.ZERO
+var walk_velocity = Vector3.ZERO
 var target_velocity_forward = 0
 var target_velocity_right = 0
 var max_ground_speed: float = 25
-var drag: float = 5
+var drag: float = 1000
 var jump_speed = 30
-var dash_speed: float = 60
 var playerCamera
 var mouse_dir = Vector2.ZERO
-var walk_accel: float = 400
+var walk_accel: float = 300
 var ground_drag: float = 150
-var dash_velocity = Vector3.ZERO
 var look_dir = Vector3.ZERO
 
 var hook_range = 1000
@@ -27,28 +24,34 @@ var hook_dir
 var hook_pull_force: float = 4
 var hook_velocity: Vector3
 var hook_lift: float
-
+var hook_max_speed: float
+var terminal_velocity: float = -70
 #@onready var hook: RayCast3D = get_node("/root/baseScene/CharacterBody3D/RayCast3D")
+const boosters = preload("res://boosters.gd")
+var booster = boosters.new()
+
 @onready var spawn_point: Node3D = get_node("/root/baseScene/gameObjects/spawnPoint")
 @onready var camera: Camera3D = $playerCamera
 @onready var hook_point: CSGSphere3D = get_node("/root/baseScene/hookpoint")
 
 func _ready():
+	add_child(booster)
 	set_slide_on_ceiling_enabled(false)
 	self.global_position = spawn_point.global_position
 	target_velocity = Vector3.ZERO
 	velocity = Vector3.ZERO
 	hooking = false
 	stomped = false
-	dashed = false
+	
+	#boosters
+	booster.boost_velocity = Vector3.ZERO
+	booster.boost_charge = 10
+	booster.can_fill = true
+	booster.boosting = false
 
 func jump_boost_timer():
 	await get_tree().create_timer(0.15).timeout
 	stomped = false
-	
-func dash_timer():
-	await get_tree().create_timer(1.0).timeout
-	dashed = false
 	
 func hook_collision():
 	var centre = get_viewport().get_size()/2
@@ -68,8 +71,8 @@ func hook_collision():
 		print("nope")
 		
 func hook_force(direction: Vector3, force: float):
-	
-	hook_velocity = direction * force * Vector3(1,1,1)
+	var hook_scalar = Vector3(1,1,1)
+	hook_velocity = direction * force * hook_scalar
 		
 func _input(event):
 	if event.is_action_pressed("restart"):
@@ -82,6 +85,13 @@ func _input(event):
 		else:
 			hooking = false
 			
+	if event.is_action_pressed("boost"):
+		"boosting"
+		booster.boost()
+	if event.is_action_released("boost"):
+		"stopped boosting"
+		booster.boost_stop()
+		
 	if event is InputEventMouseMotion:
 		mouse_dir = event.relative
 	camera.rotation.y -= mouse_dir.x * 0.01 * 0.5
@@ -106,39 +116,35 @@ func _input(event):
 #		8. if the player is using a hook, do hook velocity calculations
 #		9. set velocity to target_velocity, run move_and_slide()
 
-func _physics_process(_delta):
+func _physics_process(_delta) -> void:
 	var direction = Vector3.ZERO	#direction of player movement
 	direction = Input.get_vector("move_left","move_right","move_forward","move_backward")
+	look_dir = camera.global_basis.z
 
+	var forward: Vector3 = camera.global_basis * Vector3(direction.x, 0, direction.y)
+	var walk_dir: Vector3 = Vector3(forward.x, 0, forward.z).normalized()
+	
+	if hooking:
+		walk_dir -= (walk_dir.cross((hook_point.global_position - global_position).normalized()))/2
+		walk_dir *= 3
 	if not hooking:
 		hook_point.global_position = Vector3(0,-100,0)
-		walk_accel = 400
-		speed = 14
-		
-	if hooking or not is_on_floor():
-		walk_accel = 150
-		speed = 14
-		#$Pivot.basis = Basis.looking_at(direction)
-	var _forward: Vector3 = camera.global_transform.basis * Vector3(direction.x, 0, direction.y)
-	var walk_dir: Vector3 = Vector3(_forward.x, 0, _forward.z).normalized()
 	
-	target_target_velocity = target_velocity.move_toward(walk_dir * speed * direction.length(), walk_accel * _delta)
-	target_velocity.x = target_target_velocity.x
-	target_velocity.z = target_target_velocity.z
-	#camera.global_transform.basis * Vector3(direction.x, 0, direction.y)
-	look_dir = camera.global_transform.basis.z
+	if not is_on_floor():
+		walk_accel = 50
+	else:
+		walk_accel = 300
+	#print("vi = ", walk_velocity)
+
+	walk_velocity = target_velocity.move_toward(walk_dir * speed * direction.length(), walk_accel * _delta)
+	#print("vf = ", walk_velocity)
+	target_velocity.x = walk_velocity.x
+	target_velocity.z = walk_velocity.z
 	
 	if stomped == false:
 		jump_speed = 30
-	
-	if Input.is_action_just_pressed("dash"):
-		if dashed == false:
-			dash_velocity = dash_speed * -look_dir
-			target_velocity += dash_velocity
-			dash_timer()
-			dashed = true
 		
-	if not is_on_floor():
+	if not is_on_floor() and target_velocity.y > terminal_velocity:
 		target_velocity.y = target_velocity.y - (fall_acceleration * _delta)
 		
 		if stomped == false:
@@ -164,16 +170,22 @@ func _physics_process(_delta):
 	if hooking == true:
 		hook_dir = hook_point.position - position
 		hook_force(hook_dir.normalized(),hook_pull_force)
-		if not hook_dir.length() < 50 or hook_dir.length() < 5:
-			hooking = false
-
-		if position.y > hook_point.position.y:
-			if target_velocity.y < 0:
+		if not hook_dir.length() < 60 or hook_dir.length() < 5:
 				hooking = false
-		target_velocity += hook_velocity
-		#target_velocity = target_velocity.move_toward((hook_point.global_position - global_position) *((hook_point.global_position - global_position).length() - ini_hook_dist.length()), delta * 1000 * )
 	
+		target_velocity += hook_velocity
+		print(hook_velocity)
+		print(hook_velocity.length())
+		#target_velocity = target_velocity.move_toward((hook_point.global_position - global_position) *((hook_point.global_position - global_position).length() - ini_hook_dist.length()), _delta * 1000 * )
+	
+	if booster.boosting and booster.boost_charge >= 0:
+		print(booster.boost_charge)
+		target_velocity += booster.boost_force * -camera.global_transform.basis.z.normalized() * _delta
+		
 	velocity = target_velocity
+	
 	move_and_slide()
+	
+	target_velocity -= booster.boost_velocity
 	speed = 14
 	
