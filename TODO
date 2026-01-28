@@ -8,6 +8,7 @@ game/level design:
 
 features:
   - testing/implementation of 2 hooks (l/r)
+  - try using cross product for player movement while hooking
 
 optimization + bugfixing:
   - replace placeholder hook_point idle state
