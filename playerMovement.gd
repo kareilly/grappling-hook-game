@@ -15,7 +15,10 @@ var playerCamera
 var mouse_dir = Vector2.ZERO
 var walk_accel: float = 300
 var ground_drag: float = 150
+var forward = Vector3.ZERO
 var look_dir = Vector3.ZERO
+var walk_dir = Vector3.ZERO
+var input_direction = Vector3.ZERO
 
 var hook_range = 1000
 var hooking: bool = false
@@ -30,9 +33,9 @@ var terminal_velocity: float = -70
 const boosters = preload("res://boosters.gd")
 var booster = boosters.new()
 
-@onready var spawn_point: Node3D = get_node("/root/baseScene/gameObjects/spawnPoint")
-@onready var camera: Camera3D = $playerCamera
-@onready var hook_point: CSGSphere3D = get_node("/root/baseScene/hookpoint")
+@onready var spawn_point: Node3D = get_node("/root/BaseScene/GameObjects/SpawnPoint")
+@onready var camera: Camera3D = $PlayerCamera
+@onready var hook_point: CSGSphere3D = get_node("/root/BaseScene/Hookpoint")
 
 func _ready():
 	add_child(booster)
@@ -44,8 +47,8 @@ func _ready():
 	stomped = false
 	
 	#boosters
-	booster.boost_velocity = Vector3.ZERO
-	booster.boost_charge = 10
+	booster.velocity = Vector3.ZERO
+	booster.charge = 10
 	booster.can_fill = true
 	booster.boosting = false
 
@@ -74,6 +77,20 @@ func hook_force(direction: Vector3, force: float):
 	var hook_scalar = Vector3(1,1,1)
 	hook_velocity = direction * force * hook_scalar
 		
+func walk():
+	forward = camera.global_basis * Vector3(input_direction.x, 0, input_direction.y)
+	walk_dir = Vector3(forward.x, 0, forward.z).normalized()
+	if hooking:
+		walk_dir -= (walk_dir.cross((hook_point.global_position - global_position).normalized()))/2
+		walk_dir *= 3
+	if not hooking:
+		hook_point.global_position = Vector3(0,-100,0)
+	
+	if not is_on_floor():
+		walk_accel = 50
+	else:
+		walk_accel = 300
+	
 func _input(event):
 	if event.is_action_pressed("restart"):
 		_ready()
@@ -117,27 +134,11 @@ func _input(event):
 #		9. set velocity to target_velocity, run move_and_slide()
 
 func _physics_process(_delta) -> void:
-	var direction = Vector3.ZERO	#direction of player movement
-	direction = Input.get_vector("move_left","move_right","move_forward","move_backward")
+	input_direction = Input.get_vector("move_left","move_right","move_forward","move_backward")
 	look_dir = camera.global_basis.z
-
-	var forward: Vector3 = camera.global_basis * Vector3(direction.x, 0, direction.y)
-	var walk_dir: Vector3 = Vector3(forward.x, 0, forward.z).normalized()
 	
-	if hooking:
-		walk_dir -= (walk_dir.cross((hook_point.global_position - global_position).normalized()))/2
-		walk_dir *= 3
-	if not hooking:
-		hook_point.global_position = Vector3(0,-100,0)
-	
-	if not is_on_floor():
-		walk_accel = 50
-	else:
-		walk_accel = 300
-	#print("vi = ", walk_velocity)
-
-	walk_velocity = target_velocity.move_toward(walk_dir * speed * direction.length(), walk_accel * _delta)
-	#print("vf = ", walk_velocity)
+	walk()
+	walk_velocity = target_velocity.move_toward(walk_dir * speed * input_direction.length(), walk_accel * _delta)
 	target_velocity.x = walk_velocity.x
 	target_velocity.z = walk_velocity.z
 	
@@ -174,18 +175,21 @@ func _physics_process(_delta) -> void:
 				hooking = false
 	
 		target_velocity += hook_velocity
-		print(hook_velocity)
-		print(hook_velocity.length())
 		#target_velocity = target_velocity.move_toward((hook_point.global_position - global_position) *((hook_point.global_position - global_position).length() - ini_hook_dist.length()), _delta * 1000 * )
 	
-	if booster.boosting and booster.boost_charge >= 0:
-		print(booster.boost_charge)
-		target_velocity += booster.boost_force * -camera.global_transform.basis.z.normalized() * _delta
+	if booster.boosting and booster.charge >= 0:
+		print(booster.charge)
+		if Input.is_action_pressed("jump"):
+			target_velocity += booster.force * Vector3(0,1,0) * _delta
+		elif input_direction.x != 0:
+			target_velocity += booster.force * (camera.global_basis * Vector3(input_direction.x, 0, 0)) * _delta
+		else:
+			target_velocity += booster.force * -camera.global_transform.basis.z.normalized() * _delta
 		
 	velocity = target_velocity
 	
 	move_and_slide()
 	
-	target_velocity -= booster.boost_velocity
+	target_velocity -= booster.velocity
 	speed = 14
 	

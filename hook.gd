@@ -5,10 +5,10 @@ var end: Vector3
 
 @export var hooking: bool = false
 
-@onready var player: CharacterBody3D = get_node("/root/baseScene/CharacterBody3D")
-@onready var camera: Camera3D = get_node("/root/baseScene/CharacterBody3D/playerCamera")
-@onready var hook_point: CSGSphere3D = get_node("/root/baseScene/hookpoint")
-@onready var hook_line: CSGBox3D = get_node("/root/baseScene/hookline")
+@onready var player: CharacterBody3D = get_node("/root/BaseScene/Player")
+@onready var camera: Camera3D = get_node("/root/BaseScene/Player/PlayerCamera")
+@onready var hook_point: CSGSphere3D = get_node("/root/BaseScene/Hookpoint")
+@onready var hook_line: CSGBox3D = get_node("/root/BaseScene/Hookline")
 
 func _ready():
 	hook_line.visible = false

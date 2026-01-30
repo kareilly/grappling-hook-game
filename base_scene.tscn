@@ -1,14 +1,15 @@
-[gd_scene load_steps=6 format=3 uid="uid://cidljeiy5wrpg"]
+[gd_scene load_steps=7 format=3 uid="uid://cidljeiy5wrpg"]
 
 [ext_resource type="Script" uid="uid://cjddcnx4jl77x" path="res://playerMovement.gd" id="1_1nqys"]
 [ext_resource type="Script" uid="uid://d05ojs1jk55q6" path="res://hook.gd" id="2_qcxwf"]
 [ext_resource type="Texture2D" uid="uid://k564ggv31wjf" path="res://crosshair.png" id="3_2puwf"]
+[ext_resource type="Script" uid="uid://dmfr87amwbbc8" path="res://pickup_controller.gd" id="3_vjcsa"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_sabe2"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_oox0w"]
 
-[node name="baseScene" type="Node3D"]
+[node name="BaseScene" type="Node3D"]
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.992755, -0.00117854, 0.120148, -0.120154, -0.00973749, 0.992708, 4.65661e-10, -0.999952, -0.00980855, -0.0364216, 3.89467, 2.95452)
@@ -18,40 +19,40 @@ light_indirect_energy = 5.302
 light_volumetric_fog_energy = 2.131
 shadow_enabled = true
 
-[node name="CharacterBody3D" type="CharacterBody3D" parent="."]
+[node name="Player" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.37226, 0)
 visibility_parent = NodePath("MeshInstance3D")
 script = ExtResource("1_1nqys")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="CharacterBody3D"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 2.372, 0)
 shape = SubResource("CapsuleShape3D_sabe2")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="CharacterBody3D"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player"]
 transform = Transform3D(1.80111, 0, 0, 0, 1.88154, 0, 0, 0, 2.18134, -0.120504, 2.35215, 0)
 mesh = SubResource("CapsuleMesh_oox0w")
 skeleton = NodePath("")
 
-[node name="playerCamera" type="Camera3D" parent="CharacterBody3D"]
+[node name="PlayerCamera" type="Camera3D" parent="Player"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
 fov = 90.0
 
-[node name="terrain" type="Node3D" parent="."]
+[node name="Terrain" type="Node3D" parent="."]
 
-[node name="CSGBox3D" type="CSGBox3D" parent="terrain"]
+[node name="CSGBox3D" type="CSGBox3D" parent="Terrain"]
 transform = Transform3D(20.083, 0, 0, 0, 20, 0, 0, 0, 20, 0, -10, 0)
 use_collision = true
 size = Vector3(1.11328, 1, 1.65894)
 
-[node name="CSGBox3D2" type="CSGBox3D" parent="terrain"]
+[node name="CSGBox3D2" type="CSGBox3D" parent="Terrain"]
 transform = Transform3D(20.083, 0, 0, 0, 60, 0, 0, 0, 80, 20, 10, -55)
 use_collision = true
 
-[node name="CSGBox3D3" type="CSGBox3D" parent="terrain"]
+[node name="CSGBox3D3" type="CSGBox3D" parent="Terrain"]
 transform = Transform3D(20.083, 0, 0, 0, 60, 0, 0, 0, 80, -20, 10, -55)
 use_collision = true
 
-[node name="CSGBox3D4" type="CSGBox3D" parent="terrain"]
+[node name="CSGBox3D4" type="CSGBox3D" parent="Terrain"]
 transform = Transform3D(20, 0, 0, 0, 6, 0, 0, 0, 6, 0, 30, -40)
 use_collision = true
 
@@ -59,21 +60,29 @@ use_collision = true
 transform = Transform3D(-0.0699132, 0, -0.997553, 0, 1, 0, 0.997553, 0, -0.0699132, -15.6317, 5.04083, 0)
 visible = false
 
-[node name="hookpoint" type="CSGSphere3D" parent="."]
+[node name="Hookpoint" type="CSGSphere3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.2128, 1.46636, -0.74427)
 visible = false
 
-[node name="hookline" type="CSGBox3D" parent="."]
+[node name="Hookline" type="CSGBox3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.3939188, 3.37226, 0)
 size = Vector3(0.2, 0.2, 0.2)
 script = ExtResource("2_qcxwf")
 
-[node name="gameObjects" type="Node" parent="."]
+[node name="GameObjects" type="Node" parent="."]
 
-[node name="spawnPoint" type="Node3D" parent="gameObjects"]
+[node name="SpawnPoint" type="Node3D" parent="GameObjects"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 
-[node name="ui" type="Control" parent="."]
+[node name="Pickups" type="Node" parent="GameObjects"]
+script = ExtResource("3_vjcsa")
+
+[node name="BoostPickups" type="Node" parent="GameObjects/Pickups"]
+
+[node name="BPPlaceholder0" type="Node3D" parent="GameObjects/Pickups/BoostPickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, -35)
+
+[node name="UI" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 8
 anchor_left = 0.5
@@ -83,7 +92,7 @@ anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="crosshair" type="TextureRect" parent="ui"]
+[node name="Crosshair" type="TextureRect" parent="UI"]
 layout_mode = 0
 offset_right = 40.0
 offset_bottom = 40.0
