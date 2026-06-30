@@ -3,29 +3,32 @@ extends CharacterBody3D
 @export var speed = 14
 @export var fall_acceleration = 75
 
-var stomped = false
 var target_velocity = Vector3.ZERO
 var walk_velocity = Vector3.ZERO
 var target_velocity_forward = 0
 var target_velocity_right = 0
+
 var max_ground_speed: float = 25
-var drag: float = 1000
+var air_drag: float = 500
+var ground_drag: float = 150
 var jump_speed = 30
+var walk_accel: float = 300
+
 var playerCamera
 var mouse_dir = Vector2.ZERO
-var walk_accel: float = 300
-var ground_drag: float = 150
+
 var forward = Vector3.ZERO
 var look_dir = Vector3.ZERO
 var walk_dir = Vector3.ZERO
 var input_direction = Vector3.ZERO
 
-var hook_range = 1000
+var hook_range = 60
 var hooking: bool = false
 var ini_hook_dist
 var hook_dir
-var hook_pull_force: float = 4
+var hook_pull_force: float = 240.0
 var hook_velocity: Vector3
+var max_hook_velocity: float = 5
 var hook_lift: float
 var hook_max_speed: float
 var terminal_velocity: float = -70
@@ -38,44 +41,57 @@ var booster = boosters.new()
 @onready var hook_point: CSGSphere3D = get_node("/root/BaseScene/Hookpoint")
 
 func _ready():
+	# Initialize player
 	add_child(booster)
 	set_slide_on_ceiling_enabled(false)
 	self.global_position = spawn_point.global_position
 	target_velocity = Vector3.ZERO
 	velocity = Vector3.ZERO
 	hooking = false
-	stomped = false
 	
-	#boosters
+	# Capture mouse
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	
+	# Initialize booster variables
 	booster.velocity = Vector3.ZERO
 	booster.charge = 10
 	booster.can_fill = true
 	booster.boosting = false
-
-func jump_boost_timer():
-	await get_tree().create_timer(0.15).timeout
-	stomped = false
 	
-func hook_collision():
-	var centre = get_viewport().get_size()/2
+# Cast a new ray from a to b and get collision values
+func cast_ray(ray_origin: Vector3, ray_target: Vector3):
+	# Make ray physics query
+	var new_ray_collision = PhysicsRayQueryParameters3D.create(ray_origin, ray_target)
+	# Return results
+	return get_world_3d().direct_space_state.intersect_ray(new_ray_collision)
 	
-	var ray_origin = camera.project_ray_origin(centre)
-	var ray_end = ray_origin + camera.project_ray_normal(centre) * hook_range
+# Make a hook point with a raycast coming from the center of the camera
+func cast_hook():
+	var camera_centre = get_viewport().get_size()/2
+	var start = camera.project_ray_origin(camera_centre)
+	var ray = cast_ray(start, start + camera.project_ray_normal(camera_centre) * hook_range)
 	
-	var new_ray_collision = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
-	var ray_collision = get_world_3d().direct_space_state.intersect_ray(new_ray_collision)
-	
-	if not ray_collision.is_empty():
+	if not ray.is_empty():
 		hooking = true
-		hook_point.global_position = ray_collision.position
+		hook_point.global_position = ray.position
 		ini_hook_dist = hook_point.global_position - global_position
-		print(ray_collision.collider.name)
+		print(ray.collider.name)
 	else:
 		print("nope")
-		
-func hook_force(direction: Vector3, force: float):
+
+# ONLY call when hooking active
+func check_hook_line():
+	var ray = cast_ray(camera.global_position, (hook_point.global_position - camera.global_position).normalized() * ((hook_point.global_position - camera.global_position).length()))
+	if not ray.is_empty():
+		hooking = false
+	
+# Calculates hook force, edit hook scalar to change axis weights
+func get_hook_velocity(direction: Vector3, force: float, delta: float):
 	var hook_scalar = Vector3(1,1,1)
-	hook_velocity = direction * force * hook_scalar
+	# Modify to include centrifugal force
+	hook_velocity = direction * force * hook_scalar * delta
+	if hook_velocity.length() > max_hook_velocity:
+		hook_velocity = hook_velocity.normalized() * max_hook_velocity
 		
 func walk():
 	forward = camera.global_basis * Vector3(input_direction.x, 0, input_direction.y)
@@ -91,29 +107,37 @@ func walk():
 	else:
 		walk_accel = 300
 	
+# Player input events
 func _input(event):
+	# Restart the player's transform in the current level
 	if event.is_action_pressed("restart"):
 		_ready()
 		
-	if event.is_action_pressed("hook"): #is_action_pressed("hook"):
+	# Hook input pressed
+	if event.is_action_pressed("hook"):
 		if hooking == false:
-			print("hooked")
-			hook_collision()
+			print("hooking")
+			cast_hook()
 		else:
 			hooking = false
+			# Hook cooldown logic goes here
 			
+	# Is there any delay due to calling this before moving the camera?
+	# Start boosting		
 	if event.is_action_pressed("boost"):
-		"boosting"
 		booster.boost()
-	if event.is_action_released("boost"):
-		"stopped boosting"
-		booster.boost_stop()
 		
+	# Stop boosting
+	if event.is_action_released("boost"):
+		booster.boost_stop()
+	
+	# Move camera
 	if event is InputEventMouseMotion:
 		mouse_dir = event.relative
 	camera.rotation.y -= mouse_dir.x * 0.01 * 0.5
 	camera.rotation.x = clamp(camera.rotation.x - mouse_dir.y * 0.01 * 0.5, -1.5, 1.5)
 	
+	# This is old/outdated
 #	player movement physics process (order is essential):
 #		1. get directional input vector: direction (wasd)
 #		2. is the player using a hook?
@@ -134,62 +158,72 @@ func _input(event):
 #		9. set velocity to target_velocity, run move_and_slide()
 
 func _physics_process(_delta) -> void:
+	
+	# Get movement inputs
 	input_direction = Input.get_vector("move_left","move_right","move_forward","move_backward")
+	
+	# Get mouse position
 	look_dir = camera.global_basis.z
 	
+	# Get walk velocity
 	walk()
-	walk_velocity = target_velocity.move_toward(walk_dir * speed * input_direction.length(), walk_accel * _delta)
+	walk_velocity = target_velocity
+	walk_velocity.move_toward(walk_dir * speed * input_direction.length(), walk_accel * _delta)
 	target_velocity.x = walk_velocity.x
 	target_velocity.z = walk_velocity.z
-	
-	if stomped == false:
-		jump_speed = 30
-		
+
+	# Could refactor
 	if not is_on_floor() and target_velocity.y > terminal_velocity:
 		target_velocity.y = target_velocity.y - (fall_acceleration * _delta)
-		
-		if stomped == false:
-			if Input.is_action_just_pressed("stomp"):
-				target_velocity.y -= 40
-				stomped = true
-				
+	
 	if is_on_floor():
 		target_velocity.y = 0	#avoids conservation of downwards momentum after falling onto a floor
 		var horiz_vel = Vector3(target_velocity.x, 0, target_velocity.z)
 		if horiz_vel.length() > max_ground_speed:
 			target_velocity = target_velocity.move_toward(Vector3(target_velocity.x/horiz_vel.length(), target_velocity.y, target_velocity.z/horiz_vel.length()) * max_ground_speed, _delta * ground_drag)
 			
-		if stomped == true:
-			jump_speed = 50
-			jump_boost_timer()
-			
+		# Jumping while on ground
 		if Input.is_action_pressed("jump"):
 			target_velocity.y = jump_speed
-			jump_speed = 30
 			
-
+	# Get hook force while hooked
 	if hooking == true:
 		hook_dir = hook_point.position - position
-		hook_force(hook_dir.normalized(),hook_pull_force)
-		if not hook_dir.length() < 60 or hook_dir.length() < 5:
-				hooking = false
-	
+		
+		# Length bounds
+		if hook_dir.length() > hook_range + 10 or hook_dir.length() < 7.5/clampf((hook_dir.normalized()).dot((self.velocity).normalized()), 0.667,0.75):
+			hooking = false
+		print((hook_dir.normalized()).dot((self.velocity).normalized()))				
+		# Break hook on broken los
+		#check_hook_line()
+				
+		get_hook_velocity(hook_dir.normalized(),hook_pull_force,_delta)
 		target_velocity += hook_velocity
 		#target_velocity = target_velocity.move_toward((hook_point.global_position - global_position) *((hook_point.global_position - global_position).length() - ini_hook_dist.length()), _delta * 1000 * )
 	
+	# Get booster force
 	if booster.boosting and booster.charge >= 0:
 		print(booster.charge)
+		booster.use_boost = true
+		# Prioritize jump input for going straight up
 		if Input.is_action_pressed("jump"):
 			target_velocity += booster.force * Vector3(0,1,0) * _delta
+			
+		# Check for left/right movement input second
 		elif input_direction.x != 0:
 			target_velocity += booster.force * (camera.global_basis * Vector3(input_direction.x, 0, 0)) * _delta
+			
+		# Otherwise just use camera direction
 		else:
-			target_velocity += booster.force * -camera.global_transform.basis.z.normalized() * _delta
+			booster.use_boost = false
+			#target_velocity += (booster.force) * -hook_dir.normalized() * _delta
+			#target_velocity += booster.force * -camera.global_transform.basis.z.normalized() * _delta
 		
+	# Update player velocity
 	velocity = target_velocity
-	
 	move_and_slide()
 	
+	# End of tick setters
 	target_velocity -= booster.velocity
 	speed = 14
 	

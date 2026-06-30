@@ -8,18 +8,20 @@ const fill_interval: float = 0.1
 const fill_cd: float = 1.0
 const drain_interval: float = 0.5
 const max_speed: float = 5.0
-const force: float = 150.0
+const force: float = 100.0
 
 var velocity: Vector3
 var charge: int
 var can_fill: bool
 var boosting: bool
+var use_boost: bool
 # Called when the node enters the scene tree for the first time.
 		
 func boost():
 	boosting = true
 	can_fill = false
-	boost_drain()
+	if use_boost:
+		boost_drain()
 		
 func boost_stop():
 	boosting = false
